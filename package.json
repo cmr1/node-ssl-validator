@@ -1,0 +1,24 @@
+{
+  "name": "cmr1-ssl-checker",
+  "version": "0.0.1",
+  "description": "Scan and validate SSL certificate(s)",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmr1/node-ssl-checker.git"
+  },
+  "keywords": [
+    "cmr1",
+    "ssl",
+    "letsencrypt"
+  ],
+  "author": "Charlie McClung",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cmr1/node-ssl-checker/issues"
+  },
+  "homepage": "https://github.com/cmr1/node-ssl-checker#readme"
+}
