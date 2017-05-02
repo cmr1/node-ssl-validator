@@ -3,15 +3,15 @@
 const pkg = require('../package');
 
 module.exports = {
-  name: 'CMR1 SSL Checker',
-  description: 'Scan and validate SSL certificate(s)',
+  name: pkg.name || 'CMR1 SSL Validator',
+  description: pkg.description || 'Scan and validate SSL certificate(s)',
   helpHeader: 'Available Options',
   optionDefinitions: [
     {
       name: 'recursive',
       alias: 'r',
       type: Boolean,
-      defaultOption: false,
+      defaultValue: false,
       description: 'Scan recursively'
     },
     { 
@@ -37,6 +37,14 @@ module.exports = {
       type: RegExp,
       defaultValue: '^privkey\.pem$',
       description: 'RegExp for private key filenames (OpenSSL cmd: [underline]{rsa})'
+    },
+    {
+      name: 'expiration',
+      alias: 'e',
+      type: Number,
+      defaultValue: 30,
+      description: 'Number of days to consider certificate "expiring"',
+      typeLabel: '[underline]{days}'
     }
   ],
   logging: {

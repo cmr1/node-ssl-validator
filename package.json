@@ -1,14 +1,17 @@
 {
-  "name": "cmr1-ssl-checker",
+  "name": "cmr1-ssl-validator",
   "version": "0.0.1",
   "description": "Scan and validate SSL certificate(s)",
   "main": "index.js",
+  "bin": {
+    "ssl-validator": "bin/ssl-validator"
+  },
   "scripts": {
     "test": "npm test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cmr1/node-ssl-checker.git"
+    "url": "git+https://github.com/cmr1/node-ssl-validator.git"
   },
   "keywords": [
     "cmr1",
@@ -18,9 +21,9 @@
   "author": "Charlie McClung",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cmr1/node-ssl-checker/issues"
+    "url": "https://github.com/cmr1/node-ssl-validator/issues"
   },
-  "homepage": "https://github.com/cmr1/node-ssl-checker#readme",
+  "homepage": "https://github.com/cmr1/node-ssl-validator#readme",
   "dependencies": {
     "async": "^2.4.0",
     "cmr1-cli": "^0.1.6"

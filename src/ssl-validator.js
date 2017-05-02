@@ -7,10 +7,13 @@ const async = require('async');
 const Cmr1Cli = require('cmr1-cli');
 
 const requiredOptions = [
-  'directory'
+  'directory',
+  'certfile',
+  'keyfile',
+  'expiration'
 ];
 
-class SslChecker extends Cmr1Cli {
+class SslValidator extends Cmr1Cli {
   constructor(options) {
     super(options);
     this.groupList = {};
@@ -21,7 +24,7 @@ class SslChecker extends Cmr1Cli {
   }
 
   run(callback) {
-    this.validate(err => {
+    this.ensureOptions(err => {
       if (err) return callback(err);
 
       const dirs = Array.isArray(this.options.directory) ? this.options.directory : [ this.options.directory ];
@@ -34,7 +37,7 @@ class SslChecker extends Cmr1Cli {
             this.scan(stats.realPath, (err, group) => {
               if (err) return next(err);
 
-              this.verifyGroup(group, next);
+              this.validateGroup(group, next);
             });
           } else {
             this.warn(`${dir} is not a directory!`);
@@ -46,7 +49,7 @@ class SslChecker extends Cmr1Cli {
   }
 
   scan(dir, callback) {
-    this.log(`Scanning dir: ${dir}`);
+    this.debug(`Scanning dir: ${dir}`);
 
     fs.readdir(dir, (err, files) => {
       if (err) return callback(err);
@@ -66,7 +69,7 @@ class SslChecker extends Cmr1Cli {
               this.scan(stats.realPath, (err, group) => {
                 if (err) return next(err);
 
-                this.verifyGroup(group, next);
+                this.validateGroup(group, next);
               });
             } else {
               this.debug(`Ignoring directory: '${file}'. Set --recursive option to scan recursively.`);
@@ -90,13 +93,22 @@ class SslChecker extends Cmr1Cli {
     });
   }
 
-  verifyGroup(group, callback) {
+  validateGroup(group, callback) {
     if (group.files && Array.isArray(group.files)) {
-      this.debug('verifying group:'+group.dir);
+      this.debug('Validating group:'+group.dir);
       async.each(group.files, (file, next) => {
         const cmd = this.fileTypes.rsa.test(path.basename(file)) ? 'rsa' : 'x509';
 
-        exec(`openssl ${cmd} -noout -modulus -in ${file}`, (error, stdout, stderr) => {
+        const flags = [
+          '-noout',
+          '-modulus'
+        ];
+
+        if (cmd === 'x509') {
+          flags.push('-dates');
+        }
+
+        exec(`openssl ${cmd} ${flags.join(' ')} -in ${file}`, (error, stdout, stderr) => {
           if (error) return next(error);
 
           if (stderr) {
@@ -105,25 +117,52 @@ class SslChecker extends Cmr1Cli {
 
           this.debug(stdout);
 
-          const matches = stdout.match(/Modulus\=([^\s]+)/i);
+          const modMatches = stdout.match(/Modulus\=([^\s]+)/i);
+          const dateMatches = stdout.match(/(not(Before|After)\=.*)/gi);
 
-          if (matches && matches.length > 1) {
+          if (dateMatches && dateMatches.length > 1) {
+            // 30day * 24hr * 60min * 60sec * 1000ms
+            const expireDiff = this.options.expiration * 24 * 60 * 60 * 1000;
+            const notBefore = new Date(dateMatches[0].split('=')[1]).getTime();
+            const notAfter = new Date(dateMatches[1].split('=')[1]).getTime();
+            const now = new Date().getTime();
+
+            if (notBefore > now) {
+              return next(`Certificate file: ${file} is not valid before: ${notBefore}`);
+            } else if (now >= notAfter) {
+              return next(`Certificate file: ${file} is not valid after: ${notAfter}`);
+            } else if (now >= (notAfter - expireDiff)) {
+              return next(`Certificate file: ${file} is expiring in < ${this.options.expiration} days!`);
+            }
+          } else if (cmd === 'x509') {
+            return next(`Unable to obtain dates from file: ${file}`);
+          }
+
+          if (modMatches && modMatches.length > 1) {
             if (!group.mod) {
-              group.mod = matches[1];
+              group.mod = modMatches[1];
               return next();
-            } else if (group.mod !== matches[1]) {
+            } else if (group.mod !== modMatches[1]) {
               this.warn(`Group MOD = "${group.mod}"`);
-              this.warn(` File MOD = "${matches[1]}"`);
+              this.warn(` File MOD = "${modMatches[1]}"`);
               return next(`Modulus mismatch!`)
             } else {
-              this.success(`Validated file: ${file}`);
+              this.debug(`Validated file: ${file}`);
               return next();
             }
           } else {
             return next(`Unable to obtain modulus from file: ${file}`);
           }
         });
-      }, callback);
+      }, err => {
+        if (err) return callback(err);
+
+        if (group.files.length > 0) {
+          this.success(`Validated: ${group.dir}`);
+        }
+
+        return callback();
+      });
     } else {
       return callback(`Group: '${group}' is missing files`);
     }
@@ -134,7 +173,7 @@ class SslChecker extends Cmr1Cli {
       if (err) return callback(err);
 
       if (realPath !== path) {
-          this.warn(`Path: '${path}' resolves to: '${realPath}'`);        
+          this.debug(`Path: '${path}' resolves to: '${realPath}'`);        
       }
 
       fs.lstat(realPath, (err, stats) => {
@@ -152,7 +191,7 @@ class SslChecker extends Cmr1Cli {
     process.exit(code);
   }
 
-  validate(callback) {
+  ensureOptions(callback) {
     requiredOptions.forEach(option => {
       if (typeof this.options[option] === 'undefined') {
         return callback(`Missing required option: '${option}'`);
@@ -163,4 +202,4 @@ class SslChecker extends Cmr1Cli {
   }
 }
 
-module.exports = SslChecker;
+module.exports = SslValidator;
