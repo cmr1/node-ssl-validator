@@ -21,7 +21,7 @@ module.exports = {
       multiple: true, 
       defaultOption: true, 
       defaultValue: '.',
-      description: 'Directory to scan', 
+      description: 'Directory to scan (default = ".")', 
       typeLabel: '[underline]{directory}' 
     },
     {
@@ -29,22 +29,29 @@ module.exports = {
       alias: 'c',
       type: RegExp,
       defaultValue: '^(fullchain|cert)\.pem$',
-      description: 'RegExp for certificate filenames (OpenSSL cmd: [underline]{x509})'
+      description: 'RegExp for certificate filenames (default = "^(fullchain|cert)\.pem$")'
     },
     {
       name: 'keyfile',
       alias: 'k',
       type: RegExp,
       defaultValue: '^privkey\.pem$',
-      description: 'RegExp for private key filenames (OpenSSL cmd: [underline]{rsa})'
+      description: 'RegExp for private key filenames (default = "^privkey\.pem$")'
     },
     {
-      name: 'expiration',
-      alias: 'e',
+      name: 'time',
+      alias: 't',
       type: Number,
       defaultValue: 30,
-      description: 'Number of days to consider certificate "expiring"',
+      description: 'Time (in days) to consider certificate [bold]{expiring} (default = 30)',
       typeLabel: '[underline]{days}'
+    },
+    {
+      name: 'hook',
+      alias: 'e',
+      type: String,
+      description: 'Hook to execute when completed',
+      typeLabel: '[underline]{/path/to/hook}'
     }
   ],
   logging: {

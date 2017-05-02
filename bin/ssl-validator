@@ -7,6 +7,4 @@ const SslValidator = require('../');
 
 const sslValidator = new SslValidator(config);
 
-sslValidator.run(err => {
-  if (err) sslValidator.fail(err);
-});
+sslValidator.run();

@@ -10,12 +10,13 @@ const requiredOptions = [
   'directory',
   'certfile',
   'keyfile',
-  'expiration'
+  'time'
 ];
 
 class SslValidator extends Cmr1Cli {
   constructor(options) {
     super(options);
+    this.failures = [];
     this.groupList = {};
     this.fileTypes = {
       x509: new RegExp(this.options.certfile),
@@ -23,9 +24,9 @@ class SslValidator extends Cmr1Cli {
     };
   }
 
-  run(callback) {
+  run() {
     this.ensureOptions(err => {
-      if (err) return callback(err);
+      if (err) this.fail(err);
 
       const dirs = Array.isArray(this.options.directory) ? this.options.directory : [ this.options.directory ];
 
@@ -34,17 +35,39 @@ class SslValidator extends Cmr1Cli {
           if (err) return next(err);
           
           if (stats.isDirectory()) {
-            this.scan(stats.realPath, (err, group) => {
-              if (err) return next(err);
-
-              this.validateGroup(group, next);
-            });
+            this.processGroup(stats.realPath, next);
           } else {
             this.warn(`${dir} is not a directory!`);
             return next();
           }
         });
-      }, callback);
+      }, err => {
+        if (err) {
+          this.fail(err);
+        } else if (this.failures.length > 0) {
+          this.failures.forEach(failure => {
+            this.error(`Invalid: ${failure.dir || 'Unknown'}`);
+          });
+          this.fail(`Failed with ${this.failures.length} error(s)`);
+        } else {
+          this.finish('Finished.');
+        }
+      });
+    });
+  }
+
+  processGroup(path, callback) {
+    this.scan(path, (err, group) => {
+      if (err) return callback(err);
+
+      this.validateGroup(group, err => {
+        if (err) {
+          this.warn(err);
+          this.failures.push(group);
+        }
+
+        return callback();
+      });
     });
   }
 
@@ -66,11 +89,7 @@ class SslValidator extends Cmr1Cli {
 
           if (stats.isDirectory()) {
             if (this.options.recursive) {
-              this.scan(stats.realPath, (err, group) => {
-                if (err) return next(err);
-
-                this.validateGroup(group, next);
-              });
+              this.processGroup(stats.realPath, next);
             } else {
               this.debug(`Ignoring directory: '${file}'. Set --recursive option to scan recursively.`);
 
@@ -122,17 +141,19 @@ class SslValidator extends Cmr1Cli {
 
           if (dateMatches && dateMatches.length > 1) {
             // 30day * 24hr * 60min * 60sec * 1000ms
-            const expireDiff = this.options.expiration * 24 * 60 * 60 * 1000;
-            const notBefore = new Date(dateMatches[0].split('=')[1]).getTime();
-            const notAfter = new Date(dateMatches[1].split('=')[1]).getTime();
+            const expireDiff = this.options.time * 24 * 60 * 60 * 1000;
+            const notBeforeStr = dateMatches[0].split('=')[1];
+            const notAfterStr = dateMatches[1].split('=')[1];
+            const notBefore = new Date(notBeforeStr).getTime();
+            const notAfter = new Date(notAfterStr).getTime();
             const now = new Date().getTime();
 
             if (notBefore > now) {
-              return next(`Certificate file: ${file} is not valid before: ${notBefore}`);
+              return next(`Certificate file: ${file} is not valid before: ${notBeforeStr}`);
             } else if (now >= notAfter) {
-              return next(`Certificate file: ${file} is not valid after: ${notAfter}`);
+              return next(`Certificate file: ${file} is not valid after: ${notAfterStr}`);
             } else if (now >= (notAfter - expireDiff)) {
-              return next(`Certificate file: ${file} is expiring in < ${this.options.expiration} days!`);
+              return next(`Certificate file: ${file} is expiring in < ${this.options.time} days!`);
             }
           } else if (cmd === 'x509') {
             return next(`Unable to obtain dates from file: ${file}`);
@@ -186,9 +207,52 @@ class SslValidator extends Cmr1Cli {
     });
   }
 
+  hook(code, callback) {
+    if (this.options.hook) {
+      this.debug(`Executing hook: ${this.options.hook}`);
+
+      this.findStats(this.options.hook, (err, stats) => {
+        if (err) return callback(err);
+
+        const failed = this.failures.map(f => { return f.dir; });
+
+        exec(`${this.options.hook} ${code} ${failed.join(',')}`, (error, stdout, stderr) => {
+          if (error) return callback(error);
+
+          this.log(stdout);
+
+          if (stderr) {
+            this.warn(stderr);
+          }
+
+          return callback();
+        });
+      });
+    } else {
+      return callback();
+    }
+  }
+
   fail(msg, code=1) {
     this.error(msg);
-    process.exit(code);
+
+    this.hook(code, err => {
+      if (err) this.error(err);
+
+      process.exit(code);
+    });
+  }
+
+  finish(msg, code=0) {
+    this.success(msg);
+
+    this.hook(code, err => {
+      if (err) {
+        this.fail(err);
+      } else {
+        process.exit(code);
+      }
+    });
   }
 
   ensureOptions(callback) {
