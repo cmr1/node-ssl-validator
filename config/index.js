@@ -47,6 +47,13 @@ module.exports = {
       typeLabel: '[underline]{days}'
     },
     {
+      name: 'slack',
+      alias: 's',
+      type: String,
+      description: 'Slack webhook URL to post notifications',
+      typeLabel: '[underline]{url}'
+    },
+    {
       name: 'hook',
       alias: 'e',
       type: String,

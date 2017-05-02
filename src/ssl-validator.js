@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const exec = require('child_process').exec;
 const async = require('async');
+const Slack = require('slack-node');
 const Cmr1Cli = require('cmr1-cli');
 
 const requiredOptions = [
@@ -16,12 +17,18 @@ const requiredOptions = [
 class SslValidator extends Cmr1Cli {
   constructor(options) {
     super(options);
+
+    this.slack = new Slack();
     this.failures = [];
     this.groupList = {};
     this.fileTypes = {
       x509: new RegExp(this.options.certfile),
       rsa: new RegExp(this.options.keyfile)
     };
+
+    if (this.options.slack) {
+      this.slack.setWebhook(this.options.slack);
+    }
   }
 
   run() {
@@ -63,7 +70,7 @@ class SslValidator extends Cmr1Cli {
       this.validateGroup(group, err => {
         if (err) {
           this.warn(err);
-          this.failures.push(group);
+          this.failures.push(`${group.dir}::${err}`);
         }
 
         return callback();
@@ -214,9 +221,7 @@ class SslValidator extends Cmr1Cli {
       this.findStats(this.options.hook, (err, stats) => {
         if (err) return callback(err);
 
-        const failed = this.failures.map(f => { return f.dir; });
-
-        exec(`${this.options.hook} ${code} ${failed.join(',')}`, (error, stdout, stderr) => {
+        exec(`${this.options.hook} ${code} "${this.failures.join(';;')}"`, (error, stdout, stderr) => {
           if (error) return callback(error);
 
           this.log(stdout);
@@ -239,7 +244,45 @@ class SslValidator extends Cmr1Cli {
     this.hook(code, err => {
       if (err) this.error(err);
 
-      process.exit(code);
+      if (this.options.slack && this.slack) {
+        async.each(this.failures, (failure, next) => {
+          const parts = failure.split('::');
+          const group = parts[0] || 'Unknown';
+          const msg = parts[1] || 'Unknown';
+
+          this.slack.webhook({
+            icon_emoji: ':lock:',
+            username: 'ssl-validator',
+            attachments: [
+              {
+                fallback: 'SSL Validation Failure!',
+                pretext: 'SSL Validation Failure!',
+                color: '#D00000',
+                fields: [
+                  {
+                    title: group,
+                    value: msg,
+                    short: false
+                  }
+                ]
+              }
+            ]
+          }, (err, resp) => {
+            if (err) return next(err);
+
+            this.debug(resp);
+
+            return next();
+          });
+        }, err => {
+          if (err) this.error(err);
+
+          process.exit(code);          
+        });
+        
+      } else {
+        process.exit(code);
+      }
     });
   }
 
