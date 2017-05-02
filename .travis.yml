@@ -1,7 +1,15 @@
 language: node_js
 node_js:
-- '6.0.0'
-- '6.9.5'
-- '6.10.3'
-- '7.0.0',
-- '7.9.0'
+- '6'
+- '7'
+deploy:
+  provider: npm
+  email: admin@cmr1.com
+  api_key:
+    secure: pVCNsYs8FEjqPGBWd2BlYA2S6UFC7RPIqPDcWADwiXz3PEG5URiw7cjQyjOpdL3agiEPsASs7Ka+44fTsRJrHxRewGAWneVqSz+o4VKrZrY1VoiEiUZtejAjgKa9DvJ7S59MOWx+aAgO4YBur5EshCaKJQ6MpTl7bhTE7SI/wJT98o32YHKch3Bcujie5huHa+S5TqgBoPW23QSvFZiYJfeT08p6v/Dx20KDIn4gpLbOTDoIljiqtDycVk1qFtQWuocbheqIDw794Hf5wQNy9nBQvkSfBMLHGzc28IkAn3lqwTe6js2HWbW+1sH+tFd2iy22jRTAuwu1lUwoKEb/uwdCtJgD6KJhJXNmYhlsmX11RA6iHCq9c/k3E/cWyvd6kHKmEn8Xt6+Iry8sC3w8NCb6K7++p5qhpEvnEydy3blVtbvvTG6DtgkCcbA3mPvLYuh3enaPZ2hny4Yus1fNoeiF2YueHBAZIxKbFnyry1uN0qD3fRUWZk1b1dYlvRLRb0kJFxPcoDvQqtlFyP5lhs6bJ8V8ZinVtfEKXKl1Gqko20z65HsvvrtMto/VSeUPeS4WZAfaJaGnEmLF+cFpNNYYLCeWnj9ugvgiSKK71L7cIyGDeiInLaZhSYKi9hSUuGR/qQXjuUyMFS8uCmbzZSQcXeGI/4ZdXdzevqGHwcs=
+  on:
+    tags: true
+    repo: cmr1/node-ssl-validator
+notifications:
+  slack:
+    secure: EW3H6fk+KronvmE57cmuYVOoZNd3NLAB2U+8qWxWijqrYWZELmGROFZGXmWZJ86ENXz0uHpefxdW1PlgKflaKJ4AZcxFZwEgxgf1sbHslN+50zaSiS8uGmXE9P1FduDXwd9L1Qapwb8VsJaXPINVtdSHgAaUy/74yc6WwroVfq02vUn98KgsHcTNl9749CBlbdImt06US3Qr0F9O9DTUcyyKvhRXFN/MLv26+c/6c4tUIJcNLFXU0u/92MCmM6qYlEAi44jEdjQuCAmAFFdjH3Bnr65ruDq4UNM/G70BrYcY25EgRS2DvV2be5LC1KuWCZFtJ48f17bg56A8VV596EPUyllgWKmiiOf3GUpwTj8ooG3rn3b1ZjAu2DnOMSrVkJH/tKW77SMu9bi7yYrIHIILpHuMMOJ0VpSu4OAXbGIZyIluK4U3qXzEBiyxhXeIQF+OzXsPHbMWcPPmvSPo1zHuVdxSiPxLBU7538aTaLkXhCEkmXvIxK/Y1pYS6r3H69jTRlMygXzq4f1Ywj0HR+L8Hqmg6tj5+SN2CxLQC+TuyMsqDVmpEtFUYcAeB3HdOn5kII82x64M07j7oy1rStQBwyRLEMMqY9lsBzWip975IfTm+FnmSF0HuwpwK4T9ti5Yd+JZ/7k8UzBUH3559J7V0zetvuPlh0dhW65isKA=
