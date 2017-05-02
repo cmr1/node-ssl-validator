@@ -19,6 +19,7 @@
     "letsencrypt"
   ],
   "author": "Charlie McClung",
+  "preferGlobal": true,
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/cmr1/node-ssl-validator/issues"
