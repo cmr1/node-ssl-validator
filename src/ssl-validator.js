@@ -55,7 +55,7 @@ class SslValidator extends Cmr1Cli {
           this.fail(err);
         } else if (this.failures.length > 0) {
           this.failures.forEach(failure => {
-            this.error(failure);
+            this.error(failure.msg || failure);
           });
           this.fail(`Failed with ${this.failures.length} error(s)`);
         } else {
@@ -72,7 +72,10 @@ class SslValidator extends Cmr1Cli {
       this.validateGroup(group, err => {
         if (err) {
           this.warn(err);
-          this.failures.push(`${group.dir}::${err}`);
+          this.failures.push({
+            msg: err,
+            group
+          });
         }
 
         return callback();
@@ -89,7 +92,8 @@ class SslValidator extends Cmr1Cli {
       const group = {
         dir,
         mod: null,
-        files: []
+        files: [],
+        domains: null
       };
 
       async.each(files, (file, next) => {
@@ -124,6 +128,7 @@ class SslValidator extends Cmr1Cli {
   validateGroup(group, callback) {
     if (group.files && Array.isArray(group.files)) {
       this.debug('Validating group:'+group.dir);
+
       async.each(group.files, (file, next) => {
         const cmd = this.fileTypes.rsa.test(path.basename(file)) ? 'rsa' : 'x509';
 
@@ -134,6 +139,8 @@ class SslValidator extends Cmr1Cli {
 
         if (cmd === 'x509') {
           flags.push('-dates');
+          flags.push('-text');
+          flags.push('-certopt no_subject,no_header,no_version,no_serial,no_signame,no_validity,no_subject,no_issuer,no_pubkey,no_sigdump,no_aux')
         }
 
         exec(`openssl ${cmd} ${flags.join(' ')} -in ${file}`, (error, stdout, stderr) => {
@@ -145,8 +152,19 @@ class SslValidator extends Cmr1Cli {
 
           this.debug(stdout);
 
-          const modMatches = stdout.match(/Modulus\=([^\s]+)/i);
-          const dateMatches = stdout.match(/(not(Before|After)\=.*)/gi);
+          const modMatches = stdout.match(/Modulus\=([^\s]+)/);
+          const dnsMatches = stdout.match(/DNS\:([^,|\s]+)/g);
+          const dateMatches = stdout.match(/(not(Before|After)\=.*)/g);
+
+          if (dnsMatches && dnsMatches.length > 0) {
+            const domains = dnsMatches.map(domain => domain.substr(4).trim());
+
+            if (!group.domains) {
+              group.domains = domains;
+            } else if (group.domains.sort().join(',') !== domains.sort().join(',')) {
+              return next(`Certificate alternate DNS name mismatch: ${group.domains.sort().join(',')} !== ${domains.sort().join(',')}`);
+            }
+          }
 
           if (dateMatches && dateMatches.length > 1) {
             // 30day * 24hr * 60min * 60sec * 1000ms
@@ -223,7 +241,9 @@ class SslValidator extends Cmr1Cli {
       this.findStats(this.options.hook, (err, stats) => {
         if (err) return callback(err);
 
-        exec(`${this.options.hook} ${code} "${this.failures.join(';;')}"`, (error, stdout, stderr) => {
+        const failedDomains = this.failures.map(failure => failure.group.domains.join(',')).join(';');
+
+        exec(`${this.options.hook} ${code} "${failedDomains}"`, (error, stdout, stderr) => {
           if (error) return callback(error);
 
           this.log(stdout);
@@ -243,9 +263,7 @@ class SslValidator extends Cmr1Cli {
   notify(callback) {
     if (this.failures.length <= MAX_NOTIFICATIONS) {
       async.each(this.failures, (failure, next) => {
-        const parts = failure.split('::');
-        const group = parts[0] || 'Unknown';
-        const msg = parts[1] || 'Unknown';
+        const { group, msg } = failure;
 
         this.slack.webhook({
           icon_emoji: ':lock:',
@@ -257,7 +275,7 @@ class SslValidator extends Cmr1Cli {
               color: '#D00000',
               fields: [
                 {
-                  title: group,
+                  title: group.dir,
                   value: msg,
                   short: false
                 }
