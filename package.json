@@ -3,11 +3,19 @@
   "version": "0.0.2",
   "description": "Scan and validate SSL certificate(s)",
   "main": "index.js",
-  "bin": {
-    "ssl-validator": "bin/ssl-validator"
+  "directories": {
+    "test": "test"
   },
   "scripts": {
-    "test": "npm test"
+    "test": "mocha test/**/*.spec.js",
+    "preversion": "npm test && travis lint .travis.yml",
+    "postversion": "git push --follow-tags"
+  },
+  "engines": {
+    "node": ">=6.x"
+  },
+  "bin": {
+    "ssl-validator": "bin/ssl-validator"
   },
   "repository": {
     "type": "git",
@@ -27,6 +35,11 @@
   "homepage": "https://github.com/cmr1/node-ssl-validator#readme",
   "dependencies": {
     "async": "^2.4.0",
-    "cmr1-cli": "^0.1.6"
+    "cmr1-cli": "^0.1.6",
+    "slack-node": "^0.1.8"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^3.3.0"
   }
 }
