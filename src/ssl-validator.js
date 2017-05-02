@@ -55,7 +55,7 @@ class SslValidator extends Cmr1Cli {
           this.fail(err);
         } else if (this.failures.length > 0) {
           this.failures.forEach(failure => {
-            this.error(`Invalid: ${failure || 'Unknown'}`);
+            this.error(failure);
           });
           this.fail(`Failed with ${this.failures.length} error(s)`);
         } else {
