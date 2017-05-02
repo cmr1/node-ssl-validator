@@ -7,7 +7,7 @@ const async = require('async');
 const Slack = require('slack-node');
 const Cmr1Cli = require('cmr1-cli');
 
-const MAX_NOTIFICATIONS = 10;
+const MAX_NOTIFICATIONS = 2;
 
 const requiredOptions = [
   'directory',
@@ -267,7 +267,7 @@ class SslValidator extends Cmr1Cli {
         }, (err, resp) => {
           if (err) return next(err);
 
-          this.debug(resp);
+          this.debug('Slack webhook response:', resp);
 
           return next();
         });
@@ -290,6 +290,12 @@ class SslValidator extends Cmr1Cli {
             ]
           }
         ]
+      }, (err, resp) => {
+        if (err) return next(err);
+
+        this.debug('Slack webhook response:', resp);
+
+        return next();
       })
     }
   }
