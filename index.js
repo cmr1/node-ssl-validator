@@ -8,7 +8,5 @@ const sslChecker = new SslChecker(config);
 sslChecker.run(err => {
   if (err) sslChecker.fail(err);
 
-  sslChecker.log(sslChecker.fileList);
-
   sslChecker.success('Finished');
 });

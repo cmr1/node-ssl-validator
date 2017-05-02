@@ -7,21 +7,36 @@ module.exports = {
   description: 'Scan and validate SSL certificate(s)',
   helpHeader: 'Available Options',
   optionDefinitions: [
-    { 
-      name: 'directory', 
-      alias: 'd', 
-      type: String, 
-      multiple: true, 
-      defaultOption: true, 
-      description: 'Directory to scan', 
-      typeLabel: '[underline]{directory}' 
-    },
     {
       name: 'recursive',
       alias: 'r',
       type: Boolean,
       defaultOption: false,
       description: 'Scan recursively'
+    },
+    { 
+      name: 'directory', 
+      alias: 'd', 
+      type: String, 
+      multiple: true, 
+      defaultOption: true, 
+      defaultValue: '.',
+      description: 'Directory to scan', 
+      typeLabel: '[underline]{directory}' 
+    },
+    {
+      name: 'certfile',
+      alias: 'c',
+      type: RegExp,
+      defaultValue: '^(fullchain|cert)\.pem$',
+      description: 'RegExp for certificate filenames (OpenSSL cmd: [underline]{x509})'
+    },
+    {
+      name: 'keyfile',
+      alias: 'k',
+      type: RegExp,
+      defaultValue: '^privkey\.pem$',
+      description: 'RegExp for private key filenames (OpenSSL cmd: [underline]{rsa})'
     }
   ],
   logging: {
