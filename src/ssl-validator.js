@@ -7,6 +7,8 @@ const async = require('async');
 const Slack = require('slack-node');
 const Cmr1Cli = require('cmr1-cli');
 
+const MAX_NOTIFICATIONS = 10;
+
 const requiredOptions = [
   'directory',
   'certfile',
@@ -53,7 +55,7 @@ class SslValidator extends Cmr1Cli {
           this.fail(err);
         } else if (this.failures.length > 0) {
           this.failures.forEach(failure => {
-            this.error(`Invalid: ${failure.dir || 'Unknown'}`);
+            this.error(`Invalid: ${failure || 'Unknown'}`);
           });
           this.fail(`Failed with ${this.failures.length} error(s)`);
         } else {
@@ -238,6 +240,60 @@ class SslValidator extends Cmr1Cli {
     }
   }
 
+  notify(callback) {
+    if (this.failures.length <= MAX_NOTIFICATIONS) {
+      async.each(this.failures, (failure, next) => {
+        const parts = failure.split('::');
+        const group = parts[0] || 'Unknown';
+        const msg = parts[1] || 'Unknown';
+
+        this.slack.webhook({
+          icon_emoji: ':lock:',
+          username: 'ssl-validator',
+          attachments: [
+            {
+              fallback: 'SSL Validation Failure!',
+              pretext: 'SSL Validation Failure!',
+              color: '#D00000',
+              fields: [
+                {
+                  title: group,
+                  value: msg,
+                  short: false
+                }
+              ]
+            }
+          ]
+        }, (err, resp) => {
+          if (err) return next(err);
+
+          this.debug(resp);
+
+          return next();
+        });
+      }, callback);
+    } else {
+      this.slack.webhook({
+        icon_emoji: ':lock:',
+        username: 'ssl-validator',
+        attachments: [
+          {
+            fallback: 'SSL Validation Failure!',
+            pretext: 'SSL Validation Failure!',
+            color: '#D00000',
+            fields: [
+              {
+                title: `More than ${MAX_NOTIFICATIONS} failure(s)!`,
+                value: `${this.failures.length} total SSL validation failure(s)`,
+                short: false
+              }
+            ]
+          }
+        ]
+      })
+    }
+  }
+
   fail(msg, code=1) {
     this.error(msg);
 
@@ -245,41 +301,11 @@ class SslValidator extends Cmr1Cli {
       if (err) this.error(err);
 
       if (this.options.slack && this.slack) {
-        async.each(this.failures, (failure, next) => {
-          const parts = failure.split('::');
-          const group = parts[0] || 'Unknown';
-          const msg = parts[1] || 'Unknown';
-
-          this.slack.webhook({
-            icon_emoji: ':lock:',
-            username: 'ssl-validator',
-            attachments: [
-              {
-                fallback: 'SSL Validation Failure!',
-                pretext: 'SSL Validation Failure!',
-                color: '#D00000',
-                fields: [
-                  {
-                    title: group,
-                    value: msg,
-                    short: false
-                  }
-                ]
-              }
-            ]
-          }, (err, resp) => {
-            if (err) return next(err);
-
-            this.debug(resp);
-
-            return next();
-          });
-        }, err => {
+        this.notify(err => {
           if (err) this.error(err);
 
-          process.exit(code);          
+          process.exit(code);
         });
-        
       } else {
         process.exit(code);
       }
