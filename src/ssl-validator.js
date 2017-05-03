@@ -5,18 +5,16 @@ const path = require('path');
 const exec = require('child_process').exec;
 const async = require('async');
 const Slack = require('slack-node');
-const Cmr1Cli = require('cmr1-cli');
+const Cmr1Logger = require('cmr1-logger');
+const config = require('../config');
 
-const requiredOptions = [
-  'directory',
-  'certfile',
-  'keyfile',
-  'time'
-];
-
-class SslValidator extends Cmr1Cli {
+class SslValidator extends Cmr1Logger {
   constructor(options) {
-    super(options);
+    super();
+
+    this.enableLogging(config.cli.logging);
+
+    this.options = Object.assign({}, config.defaults, options || {});
 
     this.slack = new Slack();
     this.failures = [];
@@ -24,11 +22,11 @@ class SslValidator extends Cmr1Cli {
     this.notifications = {};
 
     if (!this.options.certfile) {
-      this.options.certfile = this.options.recursive ? '^(fullchain|cert)\.pem$' : '^(.*)\.(cer|crt|bundle)$';
+      this.options.certfile = this.options.recursive ? config.constants.GROUP_DIR.REGEX_CERTFILE : config.constants.GROUP_FILE.REGEX_CERTFILE;
     }
 
     if (!this.options.keyfile) {
-      this.options.keyfile = this.options.recursive ? '^privkey\.pem$' : '^(.*)\.(key|priv|privkey)$';
+      this.options.keyfile = this.options.recursive ? config.constants.GROUP_DIR.REGEX_KEYFILE : config.constants.GROUP_FILE.REGEX_KEYFILE;
     }
 
     this.fileTypes = {
@@ -41,9 +39,9 @@ class SslValidator extends Cmr1Cli {
     }
   }
 
-  run() {
+  run(callback) {
     this.ensureOptions(err => {
-      if (err) this.fail(err);
+      if (err) return callback(err);
 
       const dirs = Array.isArray(this.options.directory) ? this.options.directory : [ this.options.directory ];
 
@@ -58,28 +56,7 @@ class SslValidator extends Cmr1Cli {
             return next();
           }
         });
-      }, err => {
-        if (err) {
-          this.fail(err);
-        } else if (this.failures.length > 0) {
-          this.failures.forEach(failure => {
-            this.error(failure.err.msg || failure);
-          });
-          
-          this.fail(`Failed with ${this.failures.length} error(s)`);
-        } else {
-          const totalGroups = this.groupList.length;
-          const totalFiles = this.groupList.reduce((sum, group) => (sum + group.files.length), 0);
-
-          this.queueNotification('good', {
-            title: 'SSL certificates look good!',
-            value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
-            short: false
-          });
-
-          this.finish('Finished.');
-        }
-      });
+      }, callback);
     });
   }
 
@@ -154,7 +131,7 @@ class SslValidator extends Cmr1Cli {
 
             fileParts.pop();
             
-            const groupKey = this.options.recursive ? dir : fileParts.join('.');
+            const groupKey = this.options.recursive ? dir : path.join(dir, fileParts.join('.'));
 
             if (typeof groups[groupKey] === 'undefined') {
               groups[groupKey] = {
@@ -319,32 +296,6 @@ class SslValidator extends Cmr1Cli {
     });
   }
 
-  hook(code, callback) {
-    if (this.options.hook) {
-      this.debug(`Executing hook: ${this.options.hook}`);
-
-      this.findStats(this.options.hook, (err, stats) => {
-        if (err) return callback(err);
-
-        const failedDomains = this.failures.map(failure => failure.group.domains.join(',')).join(';');
-
-        exec(`${this.options.hook} ${code} "${failedDomains}"`, (error, stdout, stderr) => {
-          if (error) return callback(error);
-
-          this.log(stdout);
-
-          if (stderr) {
-            this.warn(stderr);
-          }
-
-          return callback();
-        });
-      });
-    } else {
-      return callback();
-    }
-  }
-
   slackMessage(status, fields, callback) {
     const allowedStatuses = [ 'good', 'danger', 'warning' ];
     const color = allowedStatuses.indexOf(status) !== -1 ? status : 'warning';
@@ -378,31 +329,8 @@ class SslValidator extends Cmr1Cli {
     });
   }
 
-  fail(msg) {
-    this.finish(msg, 1);
-  }
-
-  finish(msg, code=0) {
-    this.log(msg);
-
-    this.hook(code, err => {
-      if (err) {
-        this.error(err);
-        process.exit(1);
-      } else if (this.options.slack && this.slack) {
-        this.notify(err => {
-          if (err) this.error(err);
-
-          process.exit(code);
-        });
-      } else {
-        process.exit(code);
-      }
-    });
-  }
-
   ensureOptions(callback) {
-    requiredOptions.forEach(option => {
+    config.constants.REQUIRED_OPTIONS.forEach(option => {
       if (typeof this.options[option] === 'undefined') {
         return callback(`Missing required option: '${option}'`);
       }

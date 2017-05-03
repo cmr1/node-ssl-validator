@@ -2,9 +2,8 @@
 
 'use strict';
 
-const config = require('../config');
-const SslValidator = require('../');
+const SslValidatorCli = require('../src/ssl-validator-cli');
 
-const sslValidator = new SslValidator(config);
+const validator = new SslValidatorCli();
 
-sslValidator.run();
+validator.run();
