@@ -7,8 +7,6 @@ const async = require('async');
 const Slack = require('slack-node');
 const Cmr1Cli = require('cmr1-cli');
 
-const MAX_NOTIFICATIONS = 10;
-
 const requiredOptions = [
   'directory',
   'certfile',
@@ -22,7 +20,8 @@ class SslValidator extends Cmr1Cli {
 
     this.slack = new Slack();
     this.failures = [];
-    this.groupList = {};
+    this.groupList = [];
+    this.notifications = {};
     this.fileTypes = {
       x509: new RegExp(this.options.certfile),
       rsa: new RegExp(this.options.keyfile)
@@ -55,14 +54,32 @@ class SslValidator extends Cmr1Cli {
           this.fail(err);
         } else if (this.failures.length > 0) {
           this.failures.forEach(failure => {
-            this.error(failure.msg || failure);
+            this.error(failure.err.msg || failure);
           });
+          
           this.fail(`Failed with ${this.failures.length} error(s)`);
         } else {
+          const totalGroups = this.groupList.length;
+          const totalFiles = this.groupList.reduce((sum, group) => (sum + group.files.length), 0);
+
+          this.queueNotification('good', {
+            title: 'SSL certificates look good!',
+            value: `Validated ${totalGroups} certificate(s)\nProcessed ${totalFiles} file(s)`,
+            short: false
+          });
+
           this.finish('Finished.');
         }
       });
     });
+  }
+
+  queueNotification(status, field) {
+    if (typeof this.notifications[status] === 'undefined') {
+      this.notifications[status] = [];
+    }
+
+    this.notifications[status].push(field);
   }
 
   processGroup(path, callback) {
@@ -71,11 +88,25 @@ class SslValidator extends Cmr1Cli {
 
       this.validateGroup(group, err => {
         if (err) {
-          this.warn(err);
+          const status = err.status || 'warning';
+          const msg = err.msg || 'No Message';
+
+          this.warn(msg);
+
+          this.queueNotification(status, {
+            title: group.domains ? group.domains.join(', ') : 'Unknown',
+            value: msg,
+            short: false
+          });
+          
           this.failures.push({
-            msg: err,
+            err,
             group
           });
+        }
+
+        if (group.files && group.files.length > 0) {
+          this.groupList.push(group);
         }
 
         return callback();
@@ -127,24 +158,30 @@ class SslValidator extends Cmr1Cli {
 
   validateGroup(group, callback) {
     if (group.files && Array.isArray(group.files)) {
-      this.debug('Validating group:'+group.dir);
+      this.debug(`Validating group: ${group.dir}`);
 
       async.each(group.files, (file, next) => {
-        const cmd = this.fileTypes.rsa.test(path.basename(file)) ? 'rsa' : 'x509';
+        const msgPrefix = `File: ${file}\n`;
+        const type = this.fileTypes.rsa.test(path.basename(file)) ? 'rsa' : 'x509';
 
         const flags = [
           '-noout',
           '-modulus'
         ];
 
-        if (cmd === 'x509') {
+        if (type === 'x509') {
           flags.push('-dates');
           flags.push('-text');
           flags.push('-certopt no_subject,no_header,no_version,no_serial,no_signame,no_validity,no_subject,no_issuer,no_pubkey,no_sigdump,no_aux')
         }
 
-        exec(`openssl ${cmd} ${flags.join(' ')} -in ${file}`, (error, stdout, stderr) => {
-          if (error) return next(error);
+        const cmd = `openssl ${type} ${flags.join(' ')} -in ${file}`;
+
+        exec(cmd, (error, stdout, stderr) => {
+          if (error) return next({
+            status: 'danger',
+            msg: `Command failed:\n${cmd}`
+          });
 
           if (stderr) {
             this.warn(stderr);
@@ -162,7 +199,10 @@ class SslValidator extends Cmr1Cli {
             if (!group.domains) {
               group.domains = domains;
             } else if (group.domains.sort().join(',') !== domains.sort().join(',')) {
-              return next(`Certificate alternate DNS name mismatch: ${group.domains.sort().join(',')} !== ${domains.sort().join(',')}`);
+              return next({
+                status: 'danger',
+                msg: `${msgPrefix}Domain mismatch: "${group.domains.sort().join(',')}" != "${domains.sort().join(',')}"`
+              });
             }
           }
 
@@ -176,14 +216,26 @@ class SslValidator extends Cmr1Cli {
             const now = new Date().getTime();
 
             if (notBefore > now) {
-              return next(`Certificate file: ${file} is not valid before: ${notBeforeStr}`);
+              return next({
+                status: 'danger',
+                msg: `${msgPrefix}Not valid before: ${notBeforeStr}`
+              });
             } else if (now >= notAfter) {
-              return next(`Certificate file: ${file} is not valid after: ${notAfterStr}`);
+              return next({
+                status: 'danger',
+                msg: `${msgPrefix}Not valid after: ${notAfterStr}`
+              });
             } else if (now >= (notAfter - expireDiff)) {
-              return next(`Certificate file: ${file} is expiring in < ${this.options.time} days!`);
+              return next({
+                status: 'warning',
+                msg: `${msgPrefix}Expires: ${notAfterStr}`
+              });
             }
-          } else if (cmd === 'x509') {
-            return next(`Unable to obtain dates from file: ${file}`);
+          } else if (type === 'x509') {
+            return next({
+              status: 'danger',
+              msg: `${msgPrefix}Unable to obtain dates`
+            });
           }
 
           if (modMatches && modMatches.length > 1) {
@@ -193,26 +245,34 @@ class SslValidator extends Cmr1Cli {
             } else if (group.mod !== modMatches[1]) {
               this.warn(`Group MOD = "${group.mod}"`);
               this.warn(` File MOD = "${modMatches[1]}"`);
-              return next(`Modulus mismatch!`)
+              return next({
+                status: 'danger',
+                msg: `${msgPrefix}Modulus mismatch`
+              });
             } else {
-              this.debug(`Validated file: ${file}`);
               return next();
             }
           } else {
-            return next(`Unable to obtain modulus from file: ${file}`);
+            return next({
+              status: 'danger',
+              msg: `${msgPrefix}Unable to obtain modulus`
+            });
           }
         });
       }, err => {
         if (err) return callback(err);
 
         if (group.files.length > 0) {
-          this.success(`Validated: ${group.dir}`);
+          this.success(`Validated: ${group.dir} | (${group.domains.join(', ')})`);
         }
 
         return callback();
       });
     } else {
-      return callback(`Group: '${group}' is missing files`);
+      return callback({
+        status: 'danger',
+        msg: `Group: '${group}' is missing files`
+      });
     }
   }
 
@@ -260,88 +320,56 @@ class SslValidator extends Cmr1Cli {
     }
   }
 
-  notify(callback) {
-    if (this.failures.length <= MAX_NOTIFICATIONS) {
-      async.each(this.failures, (failure, next) => {
-        const { group, msg } = failure;
+  slackMessage(status, fields, callback) {
+    const allowedStatuses = [ 'good', 'danger', 'warning' ];
+    const color = allowedStatuses.indexOf(status) !== -1 ? status : 'warning';
 
-        this.slack.webhook({
-          icon_emoji: ':lock:',
-          username: 'ssl-validator',
-          attachments: [
-            {
-              fallback: 'SSL Validation Failure!',
-              pretext: 'SSL Validation Failure!',
-              color: '#D00000',
-              fields: [
-                {
-                  title: group.dir,
-                  value: msg,
-                  short: false
-                }
-              ]
-            }
-          ]
-        }, (err, resp) => {
-          if (err) return next(err);
+    this.slack.webhook({
+      icon_emoji: ':lock:',
+      username: 'ssl-validator',
+      attachments: [
+        {
+          fallback: 'SSL Validation Message',
+          color,
+          fields
+        }
+      ]
+    }, (err, resp) => {
+      if (err) return callback(err);
 
-          this.debug('Slack webhook response:', resp);
+      this.debug('Slack webhook response:', resp);
 
-          return next();
-        });
-      }, callback);
-    } else {
-      this.slack.webhook({
-        icon_emoji: ':lock:',
-        username: 'ssl-validator',
-        attachments: [
-          {
-            fallback: 'SSL Validation Failure!',
-            pretext: 'SSL Validation Failure!',
-            color: '#D00000',
-            fields: [
-              {
-                title: `More than ${MAX_NOTIFICATIONS} failure(s)!`,
-                value: `${this.failures.length} total SSL validation failure(s)`,
-                short: false
-              }
-            ]
-          }
-        ]
-      }, (err, resp) => {
-        if (err) return callback(err);
-
-        this.debug('Slack webhook response:', resp);
-
-        return callback();
-      })
-    }
+      return callback();
+    });
   }
 
-  fail(msg, code=1) {
-    this.error(msg);
+  notify(callback) {
+    async.each(Object.keys(this.notifications), (status, next) => {
+      this.slackMessage(status, this.notifications[status], next);
+    }, err => {
+      if (err) return callback(err);
+
+      return callback();
+    });
+  }
+
+  fail(msg) {
+    this.finish(msg, 1);
+  }
+
+  finish(msg, code=0) {
+    this.log(msg);
 
     this.hook(code, err => {
-      if (err) this.error(err);
-
-      if (this.options.slack && this.slack) {
+      if (err) {
+        this.error(err);
+        process.exit(1);
+      } else if (this.options.slack && this.slack) {
         this.notify(err => {
           if (err) this.error(err);
 
           process.exit(code);
         });
-      } else {
-        process.exit(code);
-      }
-    });
-  }
-
-  finish(msg, code=0) {
-    this.success(msg);
-
-    this.hook(code, err => {
-      if (err) {
-        this.fail(err);
       } else {
         process.exit(code);
       }
