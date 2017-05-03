@@ -4,6 +4,7 @@ const pkg = require('../package');
 
 module.exports = {
   name: pkg.name || 'CMR1 SSL Validator',
+  version: pkg.version || '0.0.1',
   description: pkg.description || 'Scan and validate SSL certificate(s)',
   helpHeader: 'Available Options',
   optionDefinitions: [
