@@ -64,7 +64,7 @@ class SslValidator extends Cmr1Cli {
 
           this.queueNotification('good', {
             title: 'SSL certificates look good!',
-            value: `Validated ${totalGroups} certificate(s)\nProcessed ${totalFiles} file(s)`,
+            value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
             short: false
           });
 
@@ -78,6 +78,8 @@ class SslValidator extends Cmr1Cli {
     if (typeof this.notifications[status] === 'undefined') {
       this.notifications[status] = [];
     }
+
+    field.value = field.value.replace(' - ', "\n");
 
     this.notifications[status].push(field);
   }
@@ -161,7 +163,7 @@ class SslValidator extends Cmr1Cli {
       this.debug(`Validating group: ${group.dir}`);
 
       async.each(group.files, (file, next) => {
-        const msgPrefix = `File: ${file}\n`;
+        const msgPrefix = `File: ${file} - `;
         const type = this.fileTypes.rsa.test(path.basename(file)) ? 'rsa' : 'x509';
 
         const flags = [
@@ -180,7 +182,7 @@ class SslValidator extends Cmr1Cli {
         exec(cmd, (error, stdout, stderr) => {
           if (error) return next({
             status: 'danger',
-            msg: `Command failed:\n${cmd}`
+            msg: `Command failed: - ${cmd}`
           });
 
           if (stderr) {
