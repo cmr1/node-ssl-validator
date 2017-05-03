@@ -13,7 +13,7 @@ module.exports = {
       alias: 'r',
       type: Boolean,
       defaultValue: false,
-      description: 'Scan recursively'
+      description: 'Scan recursively & group by directory'
     },
     { 
       name: 'directory', 
@@ -29,15 +29,13 @@ module.exports = {
       name: 'certfile',
       alias: 'c',
       type: RegExp,
-      defaultValue: '^(fullchain|cert)\.pem$',
-      description: 'RegExp for certificate filenames (default = "^(fullchain|cert)\.pem$")'
+      description: 'RegExp for certificate filenames'
     },
     {
       name: 'keyfile',
       alias: 'k',
       type: RegExp,
-      defaultValue: '^privkey\.pem$',
-      description: 'RegExp for private key filenames (default = "^privkey\.pem$")'
+      description: 'RegExp for private key filenames'
     },
     {
       name: 'time',

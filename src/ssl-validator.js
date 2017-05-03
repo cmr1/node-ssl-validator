@@ -22,6 +22,15 @@ class SslValidator extends Cmr1Cli {
     this.failures = [];
     this.groupList = [];
     this.notifications = {};
+
+    if (!this.options.certfile) {
+      this.options.certfile = this.options.recursive ? '^(fullchain|cert)\.pem$' : '^(.*)\.(cer|crt|bundle)$';
+    }
+
+    if (!this.options.keyfile) {
+      this.options.keyfile = this.options.recursive ? '^privkey\.pem$' : '^(.*)\.(key|priv|privkey)$';
+    }
+
     this.fileTypes = {
       x509: new RegExp(this.options.certfile),
       rsa: new RegExp(this.options.keyfile)
@@ -43,7 +52,7 @@ class SslValidator extends Cmr1Cli {
           if (err) return next(err);
           
           if (stats.isDirectory()) {
-            this.processGroup(stats.realPath, next);
+            this.processDir(stats.realPath, next);
           } else {
             this.warn(`${dir} is not a directory!`);
             return next();
@@ -84,35 +93,39 @@ class SslValidator extends Cmr1Cli {
     this.notifications[status].push(field);
   }
 
-  processGroup(path, callback) {
-    this.scan(path, (err, group) => {
+  processDir(path, callback) {
+    this.scan(path, (err, groups) => {
       if (err) return callback(err);
 
-      this.validateGroup(group, err => {
-        if (err) {
-          const status = err.status || 'warning';
-          const msg = err.msg || 'No Message';
+      async.each(Object.keys(groups), (key, next) => {
+        const group = groups[key];
 
-          this.warn(msg);
+        this.validateGroup(group, err => {
+          if (err) {
+            const status = err.status || 'warning';
+            const msg = err.msg || 'No Message';
 
-          this.queueNotification(status, {
-            title: group.domains ? group.domains.join(', ') : 'Unknown',
-            value: msg,
-            short: false
-          });
-          
-          this.failures.push({
-            err,
-            group
-          });
-        }
+            this.warn(msg);
 
-        if (group.files && group.files.length > 0) {
-          this.groupList.push(group);
-        }
+            this.queueNotification(status, {
+              title: group.domains ? group.domains.join(', ') : 'Unknown',
+              value: msg,
+              short: false
+            });
+            
+            this.failures.push({
+              err,
+              group
+            });
+          }
 
-        return callback();
-      });
+          if (group.files && group.files.length > 0) {
+            this.groupList.push(group);
+          }
+
+          return next();
+        });
+      }, callback);
     });
   }
 
@@ -122,12 +135,7 @@ class SslValidator extends Cmr1Cli {
     fs.readdir(dir, (err, files) => {
       if (err) return callback(err);
 
-      const group = {
-        dir,
-        mod: null,
-        files: [],
-        domains: null
-      };
+      const groups = {};
 
       async.each(files, (file, next) => {
         this.findStats(path.join(dir, file), (err, stats) => {
@@ -135,14 +143,29 @@ class SslValidator extends Cmr1Cli {
 
           if (stats.isDirectory()) {
             if (this.options.recursive) {
-              this.processGroup(stats.realPath, next);
+              this.processDir(stats.realPath, next);
             } else {
               this.debug(`Ignoring directory: '${file}'. Set --recursive option to scan recursively.`);
 
               return next();
             }
           } else if (this.fileTypes.x509.test(file) || this.fileTypes.rsa.test(file)) {
-            group.files.push(path.join(dir, file));
+            const fileParts = file.split('.');
+
+            fileParts.pop();
+            
+            const groupKey = this.options.recursive ? dir : fileParts.join('.');
+
+            if (typeof groups[groupKey] === 'undefined') {
+              groups[groupKey] = {
+                key: groupKey,
+                mod: null,
+                files: [],
+                domains: null
+              }
+            }
+
+            groups[groupKey].files.push(path.join(dir, file));
 
             return next();
           } else {
@@ -153,14 +176,14 @@ class SslValidator extends Cmr1Cli {
       }, err => {
         if (err) return callback(err);
 
-        return callback(null, group);
+        return callback(null, groups);
       });
     });
   }
 
   validateGroup(group, callback) {
     if (group.files && Array.isArray(group.files)) {
-      this.debug(`Validating group: ${group.dir}`);
+      this.debug(`Validating group: ${group.key}`);
 
       async.each(group.files, (file, next) => {
         const msgPrefix = `File: ${file} - `;
@@ -265,7 +288,7 @@ class SslValidator extends Cmr1Cli {
         if (err) return callback(err);
 
         if (group.files.length > 0) {
-          this.success(`Validated: ${group.dir} | (${group.domains.join(', ')})`);
+          this.success(`Validated: ${group.key} | (${group.domains.join(', ')})`);
         }
 
         return callback();
