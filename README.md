@@ -6,19 +6,19 @@ Scan and validate SSL certificates
 
 ### Table of contents
 - [CLI](#cli)
-  - [Install](#install-globally-)
-  - [Help](#show-help-)
-  - [Basic example](#basic-cli-example-)
-  - [Advanced example](#advanced-cli-example-)  
+  - [Install](#install-globally)
+  - [Help](#show-help)
+  - [Basic example](#basic-cli-example)
+  - [Advanced example](#advanced-cli-example)  
 - [Module](#module)
-  - [Install](#install-locally-)
-  - [Help](#show-help-)
-  - [Basic example](#basic-code-example-)
-  - [Advanced example](#advanced-code-example-)  
+  - [Install](#install-locally)
+  - [Help](#show-help)
+  - [Basic example](#basic-code-example)
+  - [Advanced example](#advanced-code-example)  
 - [Hooks](#hooks)
-  - [Hook arguments](#hook-arguments-)
-  - [Success example](#success-example-)
-  - [Failure example](#failure-example-)
+  - [Hook arguments](#hook-arguments)
+  - [Success example](#success-example)
+  - [Failure example](#failure-example)
 
 ## CLI
 
