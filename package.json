@@ -1,6 +1,6 @@
 {
   "name": "cmr1-ssl-validator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Scan and validate SSL certificate(s)",
   "main": "index.js",
   "directories": {
