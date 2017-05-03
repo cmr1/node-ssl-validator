@@ -56,7 +56,32 @@ class SslValidator extends Cmr1Logger {
             return next();
           }
         });
-      }, callback);
+      }, err => {
+        if (err) return callback(err);
+
+        if (this.failures.length === 0) {
+          const totalGroups = this.groupList.length;
+          const totalFiles = this.groupList.reduce((sum, group) => (sum + group.files.length), 0);
+
+          if (totalGroups > 0) {
+            this.queueNotification('good', {
+              title: 'SSL certificates look good!',
+              value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
+              short: false
+            });
+          }
+        }
+
+        if (this.options.slack && this.slack) {
+          this.notify(err => {
+            if (err) return callback(err);
+
+            return callback();
+          });
+        } else {
+          return callback();
+        }
+      });
     });
   }
 
@@ -120,7 +145,7 @@ class SslValidator extends Cmr1Logger {
 
           if (stats.isDirectory()) {
             if (this.options.recursive) {
-              this.processDir(stats.realPath, next);
+              return this.processDir(stats.realPath, next);
             } else {
               this.debug(`Ignoring directory: '${file}'. Set --recursive option to scan recursively.`);
 
@@ -225,7 +250,7 @@ class SslValidator extends Cmr1Logger {
             } else if (now >= notAfter) {
               return next({
                 status: 'danger',
-                msg: `${msgPrefix}Not valid after: ${notAfterStr}`
+                msg: `${msgPrefix}Expired: ${notAfterStr}`
               });
             } else if (now >= (notAfter - expireDiff)) {
               return next({

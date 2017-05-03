@@ -23,15 +23,6 @@ class SslValidatorCli extends Cmr1Cli {
         
         this.fail(`Failed with ${this.validator.failures.length} error(s)`);
       } else {
-        const totalGroups = this.validator.groupList.length;
-        const totalFiles = this.validator.groupList.reduce((sum, group) => (sum + group.files.length), 0);
-
-        this.validator.queueNotification('good', {
-          title: 'SSL certificates look good!',
-          value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
-          short: false
-        });
-
         this.finish('Finished.');
       }
     });
@@ -74,12 +65,6 @@ class SslValidatorCli extends Cmr1Cli {
       if (err) {
         this.error(err);
         process.exit(1);
-      } else if (this.options.slack && this.slack) {
-        this.notify(err => {
-          if (err) this.error(err);
-
-          process.exit(code);
-        });
       } else {
         process.exit(code);
       }
