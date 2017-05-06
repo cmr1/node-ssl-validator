@@ -40,6 +40,13 @@ const optionDefinitions = [
     typeLabel: '[underline]{days}'
   },
   {
+    name: 'hook',
+    alias: 'e',
+    type: String,
+    description: 'Hook to execute when completed',
+    typeLabel: '[underline]{/path/to/hook}'
+  },
+  {
     name: 'slack',
     alias: 's',
     type: String,
@@ -47,12 +54,12 @@ const optionDefinitions = [
     typeLabel: '[underline]{url}'
   },
   {
-    name: 'hook',
-    alias: 'e',
+    name: 'email',
+    alias: 'm',
     type: String,
-    description: 'Hook to execute when completed',
-    typeLabel: '[underline]{/path/to/hook}'
-  }
+    description: 'Comma separated list of email addresses to recieve notifications',
+    typeLabel: '[underline]{email1}[,[underline]{email2}]'
+  },
 ];
 
 Object.keys(defaults).forEach(option => {

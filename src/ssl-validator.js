@@ -5,6 +5,7 @@ const path = require('path');
 const exec = require('child_process').exec;
 const async = require('async');
 const Slack = require('slack-node');
+const Cmr1Aws = require('cmr1-aws');
 const Cmr1Logger = require('cmr1-logger');
 const config = require('../config');
 
@@ -16,6 +17,7 @@ class SslValidator extends Cmr1Logger {
 
     this.options = Object.assign({}, config.defaults, options || {});
 
+    this.ses = new Cmr1Aws.SES();
     this.slack = new Slack();
     this.failures = [];
     this.groupList = [];
@@ -33,10 +35,6 @@ class SslValidator extends Cmr1Logger {
       x509: new RegExp(this.options.certfile),
       rsa: new RegExp(this.options.keyfile)
     };
-
-    if (this.options.slack) {
-      this.slack.setWebhook(this.options.slack);
-    }
   }
 
   run(callback) {
@@ -72,15 +70,7 @@ class SslValidator extends Cmr1Logger {
           }
         }
 
-        if (this.options.slack && this.slack) {
-          this.notify(err => {
-            if (err) return callback(err);
-
-            return callback();
-          });
-        } else {
-          return callback();
-        }
+        this.notify(callback);
       });
     });
   }
@@ -322,26 +312,38 @@ class SslValidator extends Cmr1Logger {
   }
 
   slackMessage(status, fields, callback) {
-    const allowedStatuses = [ 'good', 'danger', 'warning' ];
-    const color = allowedStatuses.indexOf(status) !== -1 ? status : 'warning';
+    if (this.options.slack && this.slack) {
+      const allowedStatuses = [ 'good', 'danger', 'warning' ];
+      const color = allowedStatuses.indexOf(status) !== -1 ? status : 'warning';
 
-    this.slack.webhook({
-      icon_emoji: ':lock:',
-      username: 'ssl-validator',
-      attachments: [
-        {
-          fallback: 'SSL Validation Message',
-          color,
-          fields
-        }
-      ]
-    }, (err, resp) => {
-      if (err) return callback(err);
+      this.slack.setWebhook(this.options.slack);
 
-      this.debug('Slack webhook response:', resp);
+      this.slack.webhook({
+        icon_emoji: ':lock:',
+        username: 'ssl-validator',
+        attachments: [
+          {
+            fallback: 'SSL Validation Message',
+            color,
+            fields
+          }
+        ]
+      }, (err, resp) => {
+        if (err) return callback(err);
 
+        this.debug('Slack webhook response:', resp);
+
+        return callback();
+      });
+    } else {
       return callback();
-    });
+    }
+  }
+
+  emailMessage(status, fields, callback) {
+    if (this.options.email && this.ses) {
+
+    }
   }
 
   notify(callback) {
