@@ -7,6 +7,7 @@
     "test": "test"
   },
   "scripts": {
+    "pretest": "nsp check",
     "test": "mocha test/**/*.spec.js",
     "preversion": "npm test && travis lint .travis.yml",
     "postversion": "git push --follow-tags"
@@ -35,11 +36,13 @@
   "homepage": "https://github.com/cmr1/node-ssl-validator#readme",
   "dependencies": {
     "async": "^2.4.0",
+    "cmr1-aws": "^0.2.3",
     "cmr1-cli": "^0.1.6",
     "slack-node": "^0.1.8"
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "mocha": "^3.3.0"
+    "mocha": "^3.3.0",
+    "nsp": "^2.6.3"
   }
 }
