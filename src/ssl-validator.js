@@ -1,11 +1,17 @@
 'use strict';
 
+// Require system libraries
 const fs = require('fs');
 const path = require('path');
 const exec = require('child_process').exec;
+
+// Require installed packages
+const AWS = require('aws-sdk');
 const async = require('async');
 const Slack = require('slack-node');
 const Cmr1Logger = require('cmr1-logger');
+
+// Require configuration
 const config = require('../config');
 
 class SslValidator extends Cmr1Logger {
@@ -37,45 +43,156 @@ class SslValidator extends Cmr1Logger {
     if (this.options.slack) {
       this.slack.setWebhook(this.options.slack);
     }
+
+    if (this.options.acm) {
+      this.acm = new AWS.ACM();
+    }
+  }
+
+  validateAcm(callback) {
+    this.acm.listCertificates({}, (err, data) => {
+      if (err) return callback(err);
+
+      async.each(data.CertificateSummaryList, (cert, next) => {
+        const params = {
+          CertificateArn: cert.CertificateArn
+        };
+
+        const msgPrefix = `[ACM] ${cert.DomainName} - `;
+
+        this.acm.describeCertificate(params, (err, data) => {
+          if (err) return next(err);
+
+          const domains = data.Certificate.SubjectAlternativeNames;
+
+          const state = {
+            status: 'danger',
+            msg: `${msgPrefix}Status: ${data.Certificate.Status}`,
+          };
+
+          // PENDING_VALIDATION | ISSUED | INACTIVE | EXPIRED | VALIDATION_TIMED_OUT | REVOKED | FAILED
+          switch(data.Certificate.Status) {
+            case 'PENDING_VALIDATION':
+            case 'INACTIVE':
+              state.status = 'warning';
+              break;
+            case 'ISSUED':
+              state.status = 'good';
+              break;
+            default:
+              break;
+          }
+
+          // 30day * 24hr * 60min * 60sec * 1000ms
+          const expireDiff = this.options.time * 24 * 60 * 60 * 1000;
+          const notBeforeStr = data.Certificate.NotBefore;
+          const notAfterStr = data.Certificate.NotAfter;
+          const notBefore = new Date(notBeforeStr).getTime();
+          const notAfter = new Date(notAfterStr).getTime();
+          const now = new Date().getTime();
+
+          if (notBefore > now) {
+            state.status = 'danger';
+            state.msg += ` - Not valid before: ${notBeforeStr}`;
+          } else if (now >= notAfter) {
+            state.status = 'danger';
+            state.msg += ` - Expired: ${notAfterStr}`;
+          } else if (now >= (notAfter - expireDiff)) {
+            state.status = 'warning';
+            state.msg += ` - Expires: ${notAfterStr}`;
+          }
+
+          if (state.status === 'good') {
+            this.success(state.msg);
+          } else {
+            this.failures.push({
+              err: state,
+              group: {
+                domains
+              }
+            });
+
+            this.warn(state.msg);
+            this.queueNotification(state.status, {
+              title: domains.join(', '),
+              value: state.msg,
+              short: false
+            });
+          }
+
+          next();
+        });
+      }, err => {
+        if (err) return callback(err);
+
+        if (this.failures.length === 0) {
+          this.queueNotification('good', {
+            title: 'ACM SSL certificates look good!',
+            value: `Validated ${data.CertificateSummaryList.length} ACM certificate(s)`,
+            short: false
+          });
+        }
+
+        callback();
+      });
+    });
+  }
+
+  validateLocal(callback) {
+    const dirs = Array.isArray(this.options.directory) ? this.options.directory : [ this.options.directory ];
+    
+    async.each(dirs, (dir, next) => {
+      this.findStats(dir, (err, stats) => {
+        if (err) return next(err);
+        
+        if (stats.isDirectory()) {
+          this.processDir(stats.realPath, next);
+        } else {
+          this.warn(`${dir} is not a directory!`);
+          return next();
+        }
+      });
+    }, err => {
+      if (err) return callback(err);
+
+      if (this.failures.length === 0) {
+        const totalGroups = this.groupList.length;
+        const totalFiles = this.groupList.reduce((sum, group) => (sum + group.files.length), 0);
+
+        if (totalGroups > 0) {
+          this.queueNotification('good', {
+            title: 'SSL certificates look good!',
+            value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
+            short: false
+          });
+        }
+      }
+
+      callback();
+    });
   }
 
   run(callback) {
     this.ensureOptions(err => {
       if (err) return callback(err);
 
-      const dirs = Array.isArray(this.options.directory) ? this.options.directory : [ this.options.directory ];
+      const actions = [
+        this.validateLocal.bind(this)
+      ];
 
-      async.each(dirs, (dir, next) => {
-        this.findStats(dir, (err, stats) => {
-          if (err) return next(err);
-          
-          if (stats.isDirectory()) {
-            this.processDir(stats.realPath, next);
-          } else {
-            this.warn(`${dir} is not a directory!`);
-            return next();
-          }
-        });
+      if (this.options.acm) {
+        actions.push(this.validateAcm.bind(this));
+      }
+
+      async.each(actions, (action, next) => {
+        action(next);
       }, err => {
         if (err) return callback(err);
-
-        if (this.failures.length === 0) {
-          const totalGroups = this.groupList.length;
-          const totalFiles = this.groupList.reduce((sum, group) => (sum + group.files.length), 0);
-
-          if (totalGroups > 0) {
-            this.queueNotification('good', {
-              title: 'SSL certificates look good!',
-              value: `Validated ${totalGroups} certificate(s) - Processed ${totalFiles} file(s)`,
-              short: false
-            });
-          }
-        }
 
         if (this.options.slack && this.slack) {
           this.notify(err => {
             if (err) return callback(err);
-
+  
             return callback();
           });
         } else {
@@ -164,7 +281,7 @@ class SslValidator extends Cmr1Logger {
                 mod: null,
                 files: [],
                 domains: null
-              }
+              };
             }
 
             groups[groupKey].files.push(path.join(dir, file));
@@ -308,7 +425,7 @@ class SslValidator extends Cmr1Logger {
       if (err) return callback(err);
 
       if (realPath !== path) {
-          this.debug(`Path: '${path}' resolves to: '${realPath}'`);        
+        this.debug(`Path: '${path}' resolves to: '${realPath}'`);        
       }
 
       fs.lstat(realPath, (err, stats) => {
