@@ -64,7 +64,10 @@ ssl-validator \
   --slack https://hooks.slack.com/services/foo/bar/foobar \
 
   # Provide an executable hook to trigger with invalid certificate info
-  --hook /usr/bin/foo-bar
+  --hook /usr/bin/foo-bar \
+
+  # Validate certificates stored on AWS Certificate Manager (ACM)
+  --acm
 ```
 
 [Back to Top](#node-ssl-validator)
@@ -120,7 +123,10 @@ const validator = new SslValidator({
   slack: 'https://hooks.slack.com/services/foo/bar/foobar',
 
   // Provide an executable hook to trigger with invalid certificate info
-  hook: '/usr/bin/foo-bar'
+  hook: '/usr/bin/foo-bar',
+
+  // Validate certificates stored on AWS Certificate Manager (ACM)
+  acm: true
 });
 
 // Run validator with default options

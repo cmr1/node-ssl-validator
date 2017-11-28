@@ -52,6 +52,12 @@ const optionDefinitions = [
     type: String,
     description: 'Hook to execute when completed',
     typeLabel: '[underline]{/path/to/hook}'
+  },
+  {
+    name: 'acm',
+    alias: 'a',
+    type: Boolean,
+    description: 'Validate certificates on AWS ACM'
   }
 ];
 
@@ -94,7 +100,8 @@ module.exports = {
       `--keyfile "${constants.GROUP_DIR.REGEX_KEYFILE}" \\`,
       `--time ${defaults.time} \\`,
       '--slack https://hooks.slack.com/services/foo/bar/foobar \\',
-      '--hook /usr/bin/foo-bar'
+      '--hook /usr/bin/foo-bar \\',
+      '--acm'
     ]
   },
   helpHeader: 'Available Options',
