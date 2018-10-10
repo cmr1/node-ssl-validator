@@ -35,12 +35,12 @@
   "homepage": "https://github.com/cmr1/node-ssl-validator#readme",
   "dependencies": {
     "async": "^2.4.0",
-    "aws-sdk": "^2.157.0",
-    "cmr1-cli": "^0.1.8",
+    "aws-sdk": "^2.331.0",
+    "cmr1-cli": "^0.1.13",
     "slack-node": "^0.1.8"
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "mocha": "^3.3.0"
+    "mocha": "^5.2.0"
   }
 }
