@@ -7,6 +7,9 @@
     "test": "test"
   },
   "scripts": {
+    "lint": "standard",
+    "lint:fix": "standard --fix",
+    "pretest": "npm run lint",
     "test": "mocha test/**/*.spec.js",
     "preversion": "npm test && travis lint .travis.yml",
     "postversion": "git push --follow-tags"
@@ -41,6 +44,7 @@
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "standard": "^12.0.1"
   }
 }

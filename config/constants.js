@@ -1,4 +1,4 @@
-'use strict';
+/* eslint-disable no-useless-escape */
 
 module.exports = {
   REQUIRED_OPTIONS: [
