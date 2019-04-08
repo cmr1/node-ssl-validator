@@ -1,8 +1,6 @@
-'use strict';
-
-const pkg = require('../package');
-const defaults = require('./defaults');
-const constants = require('./constants');
+const pkg = require('../package')
+const defaults = require('./defaults')
+const constants = require('./constants')
 
 const optionDefinitions = [
   {
@@ -11,14 +9,14 @@ const optionDefinitions = [
     type: Boolean,
     description: 'Scan recursively & group by directory'
   },
-  { 
-    name: 'directory', 
-    alias: 'd', 
-    type: String, 
-    multiple: true, 
-    defaultOption: true, 
-    description: 'Directory to scan', 
-    typeLabel: '[underline]{directory}' 
+  {
+    name: 'directory',
+    alias: 'd',
+    type: String,
+    multiple: true,
+    defaultOption: true,
+    description: 'Directory to scan',
+    typeLabel: '[underline]{directory}'
   },
   {
     name: 'certfile',
@@ -59,21 +57,21 @@ const optionDefinitions = [
     type: Boolean,
     description: 'Validate certificates on AWS ACM'
   }
-];
+]
 
 Object.keys(defaults).forEach(option => {
-  const defaultValue = defaults[option];
-  const optionDef = optionDefinitions.filter(def => def.name === option)[0];
+  // const defaultValue = defaults[option]
+  const optionDef = optionDefinitions.filter(def => def.name === option)[0]
 
   if (optionDef) {
-    optionDef.defaultValue = defaults[option];
-    optionDef.description += ` (Default = "${defaults[option]}")`;
+    optionDef.defaultValue = defaults[option]
+    optionDef.description += ` (Default = "${defaults[option]}")`
 
     // if (constants.REQUIRED_OPTIONS.indexOf(option) !== -1) {
     //   optionDef.description += "\t REQUIRED";
     // }
   }
-});
+})
 
 module.exports = {
   name: pkg.name || 'CMR1 SSL Validator',
@@ -109,31 +107,31 @@ module.exports = {
   logging: {
     log: {
       stamp: true,
-      prefix: "",
-      color: "white"
+      prefix: '',
+      color: 'white'
     },
     warn: {
       stamp: true,
       throws: false,
-      prefix: "WARN:",
-      color: "yellow"
+      prefix: 'WARN:',
+      color: 'yellow'
     },
     error: {
       stamp: true,
       throws: false,
-      prefix: "ERROR:",
-      color: "red"
+      prefix: 'ERROR:',
+      color: 'red'
     },
     debug: {
       stamp: true,
       verbose: true,
-      prefix: "DEBUG:",
-      color: "cyan"
+      prefix: 'DEBUG:',
+      color: 'cyan'
     },
     success: {
       stamp: true,
-      prefix: "SUCCESS:",
-      color: "green"
+      prefix: 'SUCCESS:',
+      color: 'green'
     }
   }
-};
+}

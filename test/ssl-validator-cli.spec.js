@@ -1,11 +1,12 @@
-'use strict';
+/* eslint-env mocha */
+/* eslint-disable no-unused-expressions */
 
-const expect = require('chai').expect;
+const expect = require('chai').expect
 
-const SslValidatorCli = require('../src/ssl-validator-cli');
+const SslValidatorCli = require('../src/ssl-validator-cli')
 
 describe('SslValidatorCli', function () {
-    it('should exist', function () {
-        expect(SslValidatorCli).to.exist;
-    });
-});
+  it('should exist', function () {
+    expect(SslValidatorCli).to.exist
+  })
+})
